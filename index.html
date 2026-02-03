@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="./resources/ol.css">
+        <link rel="stylesheet" href="resources/fontawesome-all.min.css">
+        <link href="resources/photon-geocoder-autocomplete.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="./resources/ol-layerswitcher.css">
+        <link rel="stylesheet" href="./resources/qgis2web.css">
+        <style>
+            /* --- 0. ECRAN DE CHARGEMENT (SPLASH SCREEN) --- */
+            #loader-overlay {
+				position: fixed;
+				top: 0; left: 0; width: 100%; height: 100%;
+				
+				/* REMPLACEZ JUSTE CETTE LIGNE CI-DESSOUS */
+				background: linear-gradient(135deg, #1e3a8a, #3b82f6); /* Ici j'ai mis le bleu par exemple */
+				
+				z-index: 99999;
+                display: flex; flex-direction: column;
+                justify-content: center; align-items: center;
+                text-align: center;
+                transition: opacity 0.8s ease-out;
+                font-family: 'Arial', sans-serif;
+                padding: 20px;
+            }
+            .loader-title-1 {
+                color: white; font-size: 24px; font-weight: bold;
+                margin-bottom: 15px; text-transform: uppercase;
+                letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
+            .loader-title-2 {
+                color: #fff9c4; font-size: 20px; font-weight: bold;
+                text-transform: uppercase; letter-spacing: 1px;
+                margin-bottom: 25px; text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
+            .loader-bar-container {
+                width: 200px; height: 4px;
+                background-color: rgba(255,255,255,0.3);
+                border-radius: 2px; overflow: hidden;
+            }
+            .loader-bar-progress {
+                width: 0%; height: 100%; background-color: white;
+                animation: loadProgress 2.5s ease-in-out forwards; 
+            }
+            @keyframes loadProgress {
+                0% { width: 0%; } 50% { width: 60%; } 100% { width: 100%; }
+            }
+
+            /* --- 1. STYLES DE BASE DE LA CARTE --- */
+            html, body { background-color: #ffffff; width: 100%; height: 100%; padding: 0; margin: 0; overflow: hidden; }
+            #map { width: 100%; height: 100%; padding: 0; margin: 0; }
+            .ol-control > * { background-color: #f8f8f8!important; color: #444444!important; border-radius: 0px; }
+            .ol-attribution a, .gcd-gl-input::placeholder, .search-layer-input-search::placeholder { color: #444444!important; }
+            .search-layer-input-search { background-color: #f8f8f8!important; }
+            .ol-control > *:focus, .ol-control >*:hover { background-color: rgba(248, 248, 248, 0.7)!important; } 
+            .ol-control { background-color: rgba(255,255,255,.4) !important; padding: 2px !important; } 
+
+            /* --- 2. BARRE D'OUTILS --- */
+            .custom-toolbar {
+                position: absolute; top: 12px; left: 60px; z-index: 1000;
+                display: flex; flex-direction: column; gap: 10px;
+            }
+            .action-btn {
+                background-color: #059669; color: white; border: none; border-radius: 8px;
+                padding: 10px 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+                cursor: pointer; font-family: 'Arial', sans-serif; font-weight: bold;
+                font-size: 13px; display: flex; align-items: center; gap: 8px;
+                width: 150px; transition: background-color 0.3s, transform 0.2s;
+            }
+            .action-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
+            /* --- STYLES DES BOUTONS (Avec Dégradés Modernes) --- */
+
+/* 1. Statistiques : Vert Émeraude (Croissance, Nature) */
+.btn-stats { 
+    background: linear-gradient(135deg, #10b981, #059669); 
+}
+
+/* 2. Info : Bleu Roi (Information, Confiance) */
+.btn-info { 
+    background: linear-gradient(135deg, #3b82f6, #2563eb); 
+}
+
+/* 3. Contact : Violet (Communication, Digital) */
+.btn-contact { 
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed); 
+}
+
+/* 4. Santé : Rose/Rouge (Soin, Urgence, Vitalité) */
+.btn-sante { 
+    background: linear-gradient(135deg, #fb7185, #e11d48); 
+}
+
+/* 5. Éducation : Ambre/Jaune (CORRIGÉ - Éveil, Lumière) */
+.btn-education { 
+    background: linear-gradient(135deg, #f59e0b, #d97706); 
+}
+
+/* 6. Mise à niveau : Cyan/Turquoise (Renouveau, Modernité) */
+.btn-miseaniveau { 
+    background: linear-gradient(135deg, #22d3ee, #0891b2); 
+}
+	
+            /* --- 3. MODALE --- */
+            .modal-overlay {
+                display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background-color: rgba(15, 23, 42, 0.85); z-index: 9999;
+                justify-content: center; align-items: center; backdrop-filter: blur(4px);
+            }
+            .modal-container {
+                position: relative; width: 95%; height: 95%; background: white;
+                border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+                overflow: hidden; display: flex; flex-direction: column;
+            }
+            .modal-header {
+                height: 45px; background: #f1f5f9; display: flex;
+                justify-content: space-between; align-items: center;
+                padding: 0 15px; border-bottom: 1px solid #e2e8f0;
+            }
+            .modal-title {
+                font-family: sans-serif; font-weight: bold; color: #334155;
+                font-size: 16px; text-transform: uppercase;
+            }
+            .close-modal-btn {
+                background: #ef4444; color: white; border: none; border-radius: 4px;
+                padding: 6px 14px; cursor: pointer; font-weight: bold; font-size: 12px;
+                transition: background 0.2s;
+            }
+            .close-modal-btn:hover { background: #dc2626; }
+            #content-frame { flex: 1; width: 100%; border: none; background-color: white; }
+        </style>
+                <title>Ain Chock - Carte Interactive</title>
+    </head>
+    <body>
+	
+	<div id="loader-overlay">
+            <div class="loader-title-1">PROGRAMME DE DEVELOPPEMENT TERRITORIAL INTEGRE (PDTI)</div>
+            <div class="loader-title-2">CARTE INTERACTIVE DE LA PREFECTURE D'ARRONDISSEMENT D'AINCHOCK</div>
+            <div class="loader-bar-container">
+                <div class="loader-bar-progress"></div>
+            </div>
+        </div>
+        <div id="map">
+            <div id="popup" class="ol-popup">
+                <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+                <div id="popup-content"></div>
+            </div>
+        </div>
+		
+		<div class="custom-toolbar">
+            <button class="action-btn btn-stats" onclick="openPage('dashboard.html', 'Tableau de Bord')">
+                <i class="fa fa-chart-pie"></i> Demographie
+            </button>
+
+			<button class="action-btn btn-sante" onclick="openPage('Santé.html', 'Santé')">
+                <i class="fa fa-chart-pie"></i> Diag Santé
+            </button>
+			<button class="action-btn btn-contact" onclick="openPage('emploi.html', 'emploi')">
+                <i class="fa fa-chart-pie"></i> Diag Emploi
+            </button>
+			<button class="action-btn btn-education" onclick="openPage('education.html', 'education')">
+                <i class="fa fa-chart-pie"></i> Diag Education
+            </button>
+			<button class="action-btn btn-miseaniveau" onclick="openPage('carousselMiseANiveau.html', 'Mise Ã  Niveau')">
+                <i class="fa fa-chart-pie"></i> Mise Ã  Niveau Territoriale
+            </button>
+        </div>
+
+        <div id="main-modal" class="modal-overlay">
+            <div class="modal-container">
+                <div class="modal-header">
+                    <span id="modal-title-text" class="modal-title">Titre</span>
+                    <button class="close-modal-btn" onclick="closeModal()">FERMER X</button>
+                </div>
+                <iframe id="content-frame" src="" title="Contenu Modal"></iframe>
+            </div>
+        </div>
+        <script src="resources/qgis2web_expressions.js"></script>
+        <script src="./resources/functions.js"></script>
+        <script src="./resources/ol.js"></script>
+        <script src="./resources/ol-layerswitcher.js"></script>
+        <script src="resources/photon-geocoder-autocomplete.min.js"></script>
+        <script src="layers/PrfecturedarrondissementdeAnChockPA_An_Chockcopie_2.js"></script><script src="layers/PrfecturedarrondissementdeAnChockPA_An_Chock_3.js"></script><script src="layers/Etablissements_Santvf_4.js"></script><script src="layers/etab_educ_priv_5.js"></script><script src="layers/etab_educ_pub_nonCategoris_6.js"></script><script src="layers/etab_educ_pub_categoris_7.js"></script><script src="layers/etab_educ_surcharge_8.js"></script><script src="layers/epl_sportifs_9.js"></script><script src="layers/epl_sociaux_10.js"></script><script src="layers/epl_economiques_11.js"></script><script src="layers/epl_Sant_12.js"></script><script src="layers/epl_Culturels_13.js"></script><script src="layers/eplAdministratifs_14.js"></script><script src="layers/quartier_sous_equip_ssic_15.js"></script><script src="layers/Foyers_non_desservis_par_eau_potable_16.js"></script><script src="layers/decoupageAnnexes_Administratives_17.js"></script><script src="layers/decoupage_districts_Urb_18.js"></script>
+        <script src="styles/PrfecturedarrondissementdeAnChockPA_An_Chockcopie_2_style.js"></script><script src="styles/PrfecturedarrondissementdeAnChockPA_An_Chock_3_style.js"></script><script src="styles/Etablissements_Santvf_4_style.js"></script><script src="styles/etab_educ_priv_5_style.js"></script><script src="styles/etab_educ_pub_nonCategoris_6_style.js"></script><script src="styles/etab_educ_pub_categoris_7_style.js"></script><script src="styles/etab_educ_surcharge_8_style.js"></script><script src="styles/epl_sportifs_9_style.js"></script><script src="styles/epl_sociaux_10_style.js"></script><script src="styles/epl_economiques_11_style.js"></script><script src="styles/epl_Sant_12_style.js"></script><script src="styles/epl_Culturels_13_style.js"></script><script src="styles/eplAdministratifs_14_style.js"></script><script src="styles/quartier_sous_equip_ssic_15_style.js"></script><script src="styles/Foyers_non_desservis_par_eau_potable_16_style.js"></script><script src="styles/decoupageAnnexes_Administratives_17_style.js"></script><script src="styles/decoupage_districts_Urb_18_style.js"></script>
+        <script src="./layers/layers.js" type="text/javascript"></script> 
+        <script src="./resources/Autolinker.min.js"></script>
+        <script src="./resources/qgis2web.js"></script> 
+<script>
+            // --- 1. GESTION DU CHARGEMENT ---
+            window.addEventListener('load', function() {
+                // DÃ©lai de 2.5s pour l'animation
+                setTimeout(function() {
+                    var loader = document.getElementById('loader-overlay');
+                    loader.style.opacity = '0'; 
+                    setTimeout(function() {
+                        loader.style.display = 'none';
+                    }, 800);
+                }, 2500);
+            });
+
+            // --- 2. GESTION DES MODALES ---
+            var modal = document.getElementById('main-modal');
+            var iframe = document.getElementById('content-frame');
+            var titleSpan = document.getElementById('modal-title-text');
+
+            function openPage(url, title) {
+                titleSpan.innerText = title;
+                // Force le chargement pour Ã©viter les bugs locaux
+                iframe.src = url;
+                modal.style.display = 'flex';
+            }
+
+            function closeModal() {
+                modal.style.display = 'none';
+                iframe.src = 'about:blank'; // Nettoyage
+            }
+
+            // Fermeture au clic dehors
+            window.onclick = function(event) {
+                if (event.target == modal) {
+                    closeModal();
+                }
+            }
+        </script>			
+    </body>
+</html>
